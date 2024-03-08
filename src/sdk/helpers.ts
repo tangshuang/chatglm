@@ -2,7 +2,10 @@
 import { Stream, Duplex } from 'stream';
 
 export function adapt(stream: Stream) {
-    const du = new Duplex();
+    const du = new Duplex({
+        read() {},
+        write() {},
+    });
 
     let text = '';
     const chunks: any = [];
