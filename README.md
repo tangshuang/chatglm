@@ -15,7 +15,7 @@ npm i chatglm
 首先，你需要[在官方开放平台获取 Api Key](https://open.bigmodel.cn/usercenter/apikeys)，接下来，在nodejs代码中如下使用：
 
 ```js
-const { ChatGLM } = require('chatglm');
+const { ChatGLM, adapt } = require('chatglm');
 
 // 实例化对象
 const chat = new ChatGLM(apiKey);
@@ -34,7 +34,8 @@ const { data } = await chat.completions.careate({
 
 // 使用返回的data
 // 此时需要注意，stream参数对返回的data影响较大，具体可以参考官方API接口“内容生成流式响应块内容”部分
-data.on('data', (chunk) => {
+const stream = adapt(data); // 通过adapt方法让数据抛出的更好用
+stream.on('data', (chunk) => {
   console.log(chunk);
 });
 ```
