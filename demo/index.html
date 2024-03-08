@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+
+<pre class="output" id="out"></pre>
+<div class="form">
+  <div class="options">
+    <label>Stream: <input type="checkbox" id="stm" checked /></label>
+    <label>Draw: <input type="checkbox" id="draw" /></label>
+  </div>
+  <textarea id="txt"></textarea>
+  <button id="btn">Send</button>
+</div>
+
+<script>
+
+  const readSteamResponse = async (res, { ondata, onend }) => {
+    const utf8Decoder = new TextDecoder("utf-8");
+      const reader = res.body.getReader();
+
+      let text = '';
+      const chunks = [];
+      const extracAndPatch = () => {
+        const lines = text.split('\n');
+        lines.forEach((line, i) => {
+          if (line.indexOf('data: ') === 0) {
+            const str = line.replace('data: ', '').trim();
+            if (str === '[DONE]') {
+              text = '';
+              lines.length = 0;
+              onend(chunks);
+              return;
+            }
+            try {
+              const data = JSON.parse(str);
+              ondata(data);
+              chunks.push(data);
+              lines.splice(i, 1);
+            }
+            catch (e) {
+            }
+          }
+        });
+        text = lines.filter(Boolean).join('\n');
+      };
+
+      const processor = async () => {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          return;
+        }
+
+        const chunk = utf8Decoder.decode(value, { stream: true });
+        const str = chunk.toString();
+        text += str;
+        extracAndPatch();
+
+        await processor();
+      }
+
+      await processor();
+
+      extracAndPatch();
+  };
+
+  btn.onclick = async () => {
+    const prompt = txt.value;
+
+    const isDraw = draw.checked;
+
+    out.innerHTML = 'Loading...';
+    let isLoading = true;
+
+    if (isDraw) {
+      const res = await fetch('/draw', {
+        method: 'POST',
+        body: JSON.stringify({ prompt }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+      const { data } = await res.json();
+      out.innerHTML = '';
+      data.forEach((item) => {
+        const { url } = item;
+        const img = document.createElement('img');
+        img.src = url;
+        out.appendChild(img);
+      });
+      return;
+    }
+
+    const isStream = stm.checked;
+
+    const url = isStream ? '/chat_stream' : '/chat';
+    const res = await fetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ prompt }),
+      headers: {
+        'content-type': 'application/json',
+      },
+    });
+
+    if (isStream) {
+      const ondata = (data) => {
+        if (isLoading) {
+          out.innerHTML = '';
+          isLoading = false;
+        }
+        const { choices } = data;
+        choices.forEach((item) => {
+          const { delta, finish_reason } = item;
+          const { content } = delta;
+          out.innerHTML += content;
+        });
+      };
+
+      await readSteamResponse(res, {
+        ondata,
+        onend(items) {
+          console.log(items);
+        },
+      });
+    }
+    else {
+      const output = await res.json();
+      out.innerHTML = JSON.stringify(output, null, 4);
+    }
+
+  };
+</script>
+
+<style>
+  .output {
+    max-width: 100%;
+    overflow: auto;
+  }
+  .form {
+    width: 800px;
+    margin-left: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  #txt {
+    display: block;
+    width: 100%;
+    height: 150px;
+  }
+  #btn {
+    margin-top: 8px;
+    display: flex;
+    width: 120px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+  }
+  .options {
+    display: flex;
+  }
+  .options label {
+    display: flex;
+    align-items: center;
+    margin-left: 1em;
+  }
+</style>

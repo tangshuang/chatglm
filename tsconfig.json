@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "rootDir": "./lib",
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "target": "ES2015",
+    "module": "CommonJS",
+    "lib": ["ESNext"],
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "declaration": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noImplicitAny": true,
+    "strictPropertyInitialization": false
+  },
+  "include": [
+    "lib/**/*.ts",
+    "shim.d.ts"
+  ]
+}
