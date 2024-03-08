@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "rootDir": "./lib",
+    "rootDir": "./src",
     "baseUrl": ".",
     "outDir": "./dist",
     "target": "ES2015",
@@ -17,7 +17,7 @@
     "strictPropertyInitialization": false
   },
   "include": [
-    "lib/**/*.ts",
+    "src/**/*.ts",
     "shim.d.ts"
   ]
 }
