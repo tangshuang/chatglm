@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "main": "index.js",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tangshuang/chatglm"
+  },
+  "homepage": "https://github.com/tangshuang/chatglm#readme",
   "scripts": {
     "build": "rimraf dist && tsc",
     "dev": "node demo/index.js"
