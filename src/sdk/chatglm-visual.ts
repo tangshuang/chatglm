@@ -1,4 +1,4 @@
-import { genToken } from './auth';
+import { genToken, autoUpdateToken } from './auth';
 import { Completions } from './completions';
 import { Stream } from 'stream';
 import { CHATGLM_API_URL } from './constants';
@@ -72,6 +72,7 @@ export class ChatGLMVisual {
 
   constructor(apiKey: string) {
     this.token = genToken(apiKey);
+    autoUpdateToken(apiKey, 0, (token: string) => this.token = token);
     this.completions = new Completions({ token: this.token, apiUrl: CHATGLM_API_URL });
   }
 }

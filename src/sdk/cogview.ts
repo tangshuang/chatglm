@@ -1,4 +1,4 @@
-import { genToken } from './auth';
+import { genToken, autoUpdateToken } from './auth';
 import { COGVIEW_API_URL } from './constants';
 import axios, { AxiosResponse } from 'axios';
 
@@ -42,6 +42,7 @@ export class CogView {
 
   constructor(apiKey: string) {
     this.token = genToken(apiKey);
+    autoUpdateToken(apiKey, 0, (token: string) => this.token = token);
     this.images = new Images({ token: this.token, apiUrl: COGVIEW_API_URL });
   }
 }

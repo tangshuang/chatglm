@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-export function genToken(apiKey: string, expireSeconds = 24 * 3600 * 1000) {
+export function genToken(apiKey: string, expireSeconds = 24 * 3600) {
   const [api_key, secret] = apiKey.split('.');
 
   const now = Date.now();
@@ -21,4 +21,15 @@ export function genToken(apiKey: string, expireSeconds = 24 * 3600 * 1000) {
 
   const token = jwt.sign(payload, secret, options);
   return token;
+}
+
+export function autoUpdateToken(apiKey: string, expireSeconds: number, onGen: Function) {
+  expireSeconds = expireSeconds || 24 * 3600;
+
+  const update = () => {
+    const token = genToken(apiKey, expireSeconds);
+    onGen(token);
+  };
+
+  setInterval(update, expireSeconds - 120);
 }
