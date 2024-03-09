@@ -1,6 +1,7 @@
 import { genToken, autoUpdateToken } from './auth';
 import { CHARACTER_GLM_SSE_API_URL } from './constants';
 import axios, { AxiosResponse } from 'axios';
+import { Stream, Duplex } from 'stream';
 
 export type Message = {
     role: 'user' | 'assistant';
@@ -69,5 +70,45 @@ export class CharacterGLM {
         this.token = genToken(apiKey);
         autoUpdateToken(apiKey, 0, (token: string) => this.token = token);
         this.sse = new SSE({ token: this.token, apiUrl: CHARACTER_GLM_SSE_API_URL });
+    }
+
+    static adapt(stream: Stream) {
+        const du = new Duplex({
+            read() { },
+            write() { },
+        });
+
+        const parseChunk = (str: string) => {
+            const chunk: any = {};
+            const lines = str.trim().split('\n');
+            lines.forEach((line) => {
+                const index = line.indexOf(':');
+                const key = line.substring(0, index);
+                const value = line.substring(index + 1);
+                try {
+                    chunk[key] = JSON.parse(value);
+                }
+                catch (e) {
+                    chunk[key] = value;
+                }
+            });
+            return chunk;
+        };
+
+        const chunks: any[] = [];
+        stream.on('data', (chunk) => {
+            const str = chunk.toString();
+            const items = str.split('\n\n').map((item: string) => item.trim()).filter(Boolean);
+            items.forEach((item: string) => {
+                const obj = parseChunk(item);
+                chunks.push(obj);
+                du.emit('data', JSON.stringify(obj));
+            });
+        });
+        stream.on('end', () => {
+            du.emit('end', JSON.stringify(chunks));
+        });
+
+        return du;
     }
 }

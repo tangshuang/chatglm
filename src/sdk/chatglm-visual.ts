@@ -2,6 +2,7 @@ import { genToken, autoUpdateToken } from './auth';
 import { Completions } from './completions';
 import { Stream } from 'stream';
 import { CHATGLM_API_URL } from './constants';
+import { adapt } from './helpers';
 
 export type Message = {
   role: 'user';
@@ -75,4 +76,6 @@ export class ChatGLMVisual {
     autoUpdateToken(apiKey, 0, (token: string) => this.token = token);
     this.completions = new Completions({ token: this.token, apiUrl: CHATGLM_API_URL });
   }
+
+  static adapt = adapt;
 }
