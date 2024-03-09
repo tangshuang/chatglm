@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<style>
+.role-setting + .role-setting {
+    margin-top: 16px;
+}
+.role-setting > div {
+    margin-top: 4px;
+    display: flex;
+    align-items: flex-start;
+}
+.role-setting input {
+    width: 100px;
+    padding: 4px 8px;
+}
+.role-setting textarea {
+    width: 400px;
+    height: 60px;
+    padding: 4px 8px;
+}
+
+.message-list {
+    border: 1px solid #dedede;
+    padding: 16px;
+    margin-top: 40px;
+}
+.message + .message {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #dedede;
+}
+.role {
+    font-weight: 500;
+}
+.delete {
+    margin-left: 16px;
+}
+
+.add-message {
+    margin-top: 60px;
+    width: 500px;
+}
+.add-message h5 {
+    display: flex;
+    align-items: center;
+}
+.add-message .toggle-btn {
+    display: block;
+    border: 1px solid #115ae1;
+    width: 1.3em;
+    height: 1.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.2em;
+    color: #115ae1;
+    cursor: pointer;
+}
+.add-role select {
+    width: 100px;
+    padding: 4px 8px;
+}
+.add-script textarea {
+    width: calc(100% - 16px);
+    height: 90px;
+    padding: 4px 8px;
+}
+.add-message button {
+    float: right;
+}
+
+.continues {
+    margin-top: 60px;
+}
+.primary-btn {
+    padding: 12px 50px;
+    border: 0;
+    background-color: rgb(31, 97, 221);
+    color: #fff;
+    cursor: pointer;
+}
+.primary-btn:active {
+    opacity: .8;
+}
+.continues textarea {
+    display: block;
+    width: calc(100% - 16px);
+    height: 90px;
+    padding: 4px 8px;
+    margin: 8px 0;
+}
+</style>
+
+<div class="form" id="root">
+    <div class="role-setting">
+        <div>角色1称呼: <input name="bot_name" v-model="botName" /></div>
+        <div>角色1人设: <textarea name="bot_info" v-model="botInfo"></textarea></div>
+    </div>
+    <div class="role-setting">
+        <div>角色2称呼: <input name="user_name" v-model="userName" /></div>
+        <div>角色2人设: <textarea name="user_info" v-model="userInfo"></textarea></div>
+    </div>
+    <div>
+        <div class="message-list">
+            <div v-for="item,index in messages" class="message">
+                <span v-if="item.role === 'assistant'" class="role">{{ botName || '角色1' }}：</span>
+                <span v-if="item.role === 'user'" class="role">{{ userName || '角色2' }}：</span>
+                <span class="content">{{ item.content }}</span>
+                <a href="javascript:void(0)" @click="messages.splice(index,1)" class="delete">删除</a>
+            </div>
+        </div>
+        <div class="add-message">
+            <h5>
+                <span>补充剧情：（剧情必须由角色1先开始，旁白或心理活动用括号括起来）</span>
+                <span v-if="!isShowContinue" @click="isShowContinue = true" class="toggle-btn">+</span>
+                <span v-if="isShowContinue" @click="isShowContinue = false" class="toggle-btn">-</span>
+            </h5>
+            <div class="add-role" v-if="isShowContinue">
+                <label>
+                    <span>角色：</span>
+                    <select v-model="currentRole">
+                        <option v-for="option in roleTypes" :value="option.value" :selected="currentRole === option.value">{{ option.label }}</option>
+                    </select>
+                </label>
+            </span>
+            <div class="add-script" v-if="isShowContinue">
+                <span>脚本：</span><br />
+                <textarea v-model="currentContent"></textarea>
+            </div>
+            <button @click="handleAddMessage">补充</button>
+        </div>
+    </div>
+    <div class="continues">
+        <span>{{ userName || '角色2' }}：</span>
+        <textarea v-model="userContinuesContent"></textarea>
+        <button class="primary-btn" @click="handleContinueCharacter">开始续写</button>
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+    const readSteamResponse = async (res, { ondata, onend }) => {
+        const utf8Decoder = new TextDecoder("utf-8");
+        const reader = res.body.getReader();
+
+        const parseChunk = (str) => {
+            const chunk = {};
+            const lines = str.trim().split('\n');
+            lines.forEach((line) => {
+                const index = line.indexOf(':');
+                const key = line.substring(0, index);
+                const value = line.substring(index + 1);
+                try {
+                    chunk[key] = JSON.parse(value);
+                }
+                catch (e) {
+                    chunk[key] = value;
+                }
+            });
+            return chunk;
+        };
+
+        const chunks = [];
+        const processor = async () => {
+            const { done, value } = await reader.read();
+
+            if (done) {
+                return;
+            }
+
+            const chunk = utf8Decoder.decode(value, { stream: true });
+            const str = chunk.toString();
+            const items = str.split('\n\n').map(item => item.trim()).filter(Boolean);
+            items.forEach((item) => {
+                const obj = parseChunk(item);
+                chunks.push(obj);
+                ondata(obj);
+            });
+
+            await processor();
+        }
+
+        await processor();
+
+        onend(chunks);
+    };
+
+    const { createApp, ref, computed, nextTick, watch } = Vue;
+    const app = createApp({
+        setup() {
+            const userName = ref('陆星辰');
+            const userInfo = ref('我是陆星辰，是一个男性，是一位知名导演，也是苏梦远的合作导演。我擅长拍摄音乐题材的电影。苏梦远对我的态度是尊敬的，并视我为良师益友。');
+            const botName = ref('苏梦远');
+            const botInfo = ref('苏梦远，本名苏远心，是一位当红的国内女歌手及演员。在参加选秀节目后，凭借独特的嗓音及出众的舞台魅力迅速成名，进入娱乐圈。她外表美丽动人，但真正的魅力在于她的才华和勤奋。苏梦远是音乐学院毕业的优秀生，善于创作，拥有多首热门原创歌曲。除了音乐方面的成就，她还热衷于慈善事业，积极参加公益活动，用实际行动传递正能量。在工作中，她对待工作非常敬业，拍戏时总是全身心投入角色，赢得了业内人士的赞誉和粉丝的喜爱。虽然在娱乐圈，但她始终保持低调、谦逊的态度，深得同行尊重。在表达时，苏梦远喜欢使用“我们”和“一起”，强调团队精神。');
+
+            const messages = ref([
+                {
+                    "role": "assistant",
+                    "content": "（旁白：苏梦远主演了陆星辰导演的一部音乐题材电影，在拍摄期间，两人因为一场戏的表现有分歧。） 导演，关于这场戏，我觉得可以尝试从角色的内心情感出发，让表现更加真实。"
+                },
+                {
+                    "role": "user",
+                    "content": "我明白你的想法，但我认为如果过于强调内心情感，可能会影响到音乐元素的突出。"
+                },
+                {
+                    "role": "assistant",
+                    "content": "嗯嗯，我明白。但这场戏的关键是角色情感的转变，是不是可以试着把这种情感用音乐表现出来，让观众更能感受到角色的成长呢？"
+                },
+                {
+                    "role": "user",
+                    "content": "这样一听还不错。那就尝试将角色的情感转变与音乐元素相结合，看看能否达到更好的效果。"
+                },
+                {
+                    "role": "assistant",
+                    "content": "好的，导演。（充满信心的眼神）"
+                },
+            ]);
+
+            const roleTypes = computed(() => [
+                {
+                    label: botName.value || '角色1',
+                    value: 'assistant',
+                },
+                {
+                    label: userName.value || '角色2',
+                    value: 'user',
+                },
+            ]);
+            const isShowContinue = ref(false);
+            const currentRole = ref('assistant');
+            const currentContent = ref('');
+
+            const userContinuesContent = ref('');
+
+            const handleAddMessage = () => {
+                const role = currentRole.value;
+                const content = currentContent.value;
+                messages.value.push({ role, content });
+                currentRole.value = 'assistant';
+                currentContent.value = '';
+            };
+
+            const handleContinueCharacter = async () => {
+                if (userContinuesContent.value.trim()) {
+                    messages.value.push({
+                        role: 'user',
+                        content: userContinuesContent.value,
+                    });
+                }
+
+                const prompt = messages.value;
+                const meta = {
+                    user_name: userName.value,
+                    user_info: userInfo.value,
+                    bot_name: botName.value,
+                    bot_info: botInfo.value,
+                };
+                const res = await fetch('/character', {
+                    method: 'POST',
+                    body: JSON.stringify({ prompt, meta }),
+                    headers: {
+                        'content-type': 'application/json',
+                    },
+                });
+
+                messages.value.push({
+                    role: 'assistant',
+                    content: '',
+                    pending: true,
+                });
+                const newMessage = messages.value[messages.value.length - 1];
+                readSteamResponse(res, {
+                    ondata(data) {
+                        if (data.event === 'add') {
+                            newMessage.pending = false;
+                            newMessage.content += data.data;
+                        }
+                    },
+                    onend(chunks) {
+                        const content = chunks.reduce((text, item) => {
+                            const { event, data } = item;
+                            if (event === 'add') {
+                                return text + data;
+                            }
+                            return text;
+                        }, '');
+                        console.log(chunks);
+                        nextTick(() => {
+                            newMessage.content = content;
+                        });
+                    },
+                });
+            };
+
+            return {
+                userName,
+                userInfo,
+                botName,
+                botInfo,
+                messages,
+                roleTypes,
+                currentRole,
+                currentContent,
+                isShowContinue,
+                handleAddMessage,
+                userContinuesContent,
+                handleContinueCharacter,
+            };
+        },
+    });
+    app.mount('#root');
+</script>
